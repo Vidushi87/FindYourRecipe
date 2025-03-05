@@ -1,103 +1,102 @@
 import React, { useEffect, useState } from "react";
 import RecipeCard from "./RecipeCard";
+import SearchRecipe from "./SearchRecipe";
+import Header from "./Header";
+import RecipeFilters from "./RecipeFilters";
 
 const Recipes = () => {
-  const [food_recipes, setfood_recipes] = useState([]);
-  const [search_recipe, setSearch_recipe] = useState("");
-  const [search_query, setSearch_Query] = useState("chicken");
+  const [foodRecipe, setFoodRecipe] = useState([]);
+  const [filteredRecipes, setFilteredRecipes] = useState([]);
+  const [searchRecipe, setSearchRecipe] = useState("");
+  const [searchQuery, setSearchQuery] = useState("chicken");
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState({
+    vegetarian: false,
+    vegan: false,
+    glutenFree: false,
+    courseType: "",
+  });
+
+  const API_KEY = "9ab87f7b254948e89df4a4692b1ced55";
 
   useEffect(() => {
-    getRecipesFunction();
-  }, [search_query]);
+    setFoodRecipe([]);
+    setOffset(0);
+    getRecipesFunction(0);
+  }, [searchQuery]);
 
-  const getRecipesFunction = async () => {
+  const getRecipesFunction = async (newOffset) => {
+    setLoading(true);
     try {
       const response = await fetch(
-        `https://www.themealdb.com/api/json/v1/1/search.php?s=${search_query}`
+        `https://api.spoonacular.com/recipes/complexSearch?query=${searchQuery}&apiKey=${API_KEY}&number=16&offset=${newOffset}&addRecipeInformation=true`
       );
       const data = await response.json();
-      setfood_recipes(data.meals || []); // Handle cases where no meals are found
+      setFoodRecipe((prevRecipes) => [...prevRecipes, ...(data.results || [])]);
+      setOffset(newOffset + 16);
     } catch (error) {
       console.error("Error fetching recipes:", error);
-      setfood_recipes([]); // Set to empty array on error
     }
+    setLoading(false);
   };
 
-  const updateSearchFunction = (e) => {
-    setSearch_recipe(e.target.value);
-  };
+  // 🔥 Update Filtered Recipes when `filters` or `foodRecipe` changes
+  useEffect(() => {
+    const filtered = foodRecipe.filter((recipe) => {
+      if (filters.vegetarian && !recipe.vegetarian) return false;
+      if (filters.vegan && !recipe.vegan) return false;
+      if (filters.glutenFree && !recipe.glutenFree) return false;
+      if (
+        filters.courseType &&
+        recipe.dishTypes &&
+        !recipe.dishTypes.includes(filters.courseType)
+      )
+        return false;
+      return true;
+    });
 
-  const getSearchFunction = (e) => {
-    e.preventDefault();
-    setSearch_Query(search_recipe);
-    setSearch_recipe("");
-  };
+    setFilteredRecipes(filtered);
+  }, [filters, foodRecipe]);
 
   return (
-    <div className="bg-blue-50 min-h-screen font-sans">
-      <header className="bg-blue-500 py-4 text-white">
-        <div className="container mx-auto text-center">
-          <h1
-            className="text-3xl sm:text-4xl 
-                                   md:text-5xl lg:text-6xl
-                                   font-extrabold tracking-tight"
-          >
-            <span className="block">GeeksforGeeks Recipe Finder</span>
-          </h1>
-        </div>
-      </header>
-      <div
-        className="container mx-auto mt-8 p-4 
-                            sm:px-6 lg:px-8"
-      >
-        <form
-          onSubmit={getSearchFunction}
-          className="bg-white p-4 sm:p-6 
-                               lg:p-8 rounded-lg shadow-md 
-                               flex flex-col sm:flex-row items-center 
-                               justify-center space-y-4 sm:space-y-0 
-                               sm:space-x-4"
-        >
-          <div
-            className="relative justify-center flex-grow
-                                    w-full sm:w-1/2"
-          >
-            <input
-              type="text"
-              name="search"
-              value={search_recipe}
-              onChange={updateSearchFunction}
-              placeholder="Search for recipes..."
-              className="w-full py-3 px-4 bg-gray-100 
-                                       border border-blue-300 focus:ring-blue-500 
-                                       focus:border-blue-500 rounded-full 
-                                       text-gray-700 outline-none transition-colors 
-                                       duration-200 ease-in-out focus:ring-2 
-                                       focus:ring-blue-900 focus:bg-transparent 
-                                       focus:shadow-md"
-            />
-          </div>
-          <button
-            type="submit"
-            className="bg-blue-500 hover:bg-blue-600 focus:ring-2 
-                        focus:ring-blue-900 text-white font-semibold py-3 px-6 
-                        rounded-full transform hover:scale-105 transition-transform 
-                        focus:outline-none focus:ring-offset-2 
-                        focus:ring-offset-blue-700"
-          >
-            Search Recipe
-          </button>
-        </form>
-      </div>
+    <div className="bg-yellow-50 min-h-screen font-sans">
+      <Header />
+      <SearchRecipe
+        updateSearchFunction={(e) => setSearchRecipe(e.target.value)}
+        getSearchFunction={(e) => {
+          e.preventDefault();
+          setSearchQuery(searchRecipe);
+          setSearchRecipe("");
+        }}
+        searchRecipe={searchRecipe}
+      />
+      <RecipeFilters filters={filters} setFilters={setFilters} />
 
       <div className="container mx-auto mt-8 p-4 sm:px-6 lg:px-8">
-        <div
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 
-                lg:grid-cols-4 gap-4"
-        >
-          {food_recipes.map((recipe) => (
-            <RecipeCard key={recipe.idMeal} recipe={recipe} />
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filteredRecipes.length > 0 ? (
+            filteredRecipes.map((recipe, index) => (
+              <RecipeCard
+                key={recipe.id ? `${recipe.id}-${index}` : `recipe-${index}`}
+                recipe={recipe}
+              />
+            ))
+          ) : (
+            <p className="text-center col-span-4 text-gray-600">
+              No recipes found.
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={() => getRecipesFunction(offset)}
+            disabled={loading}
+            className="bg-[#f79788] text-white font-semibold py-2 px-6 rounded-lg hover:bg-[#e67b72] transition-all"
+          >
+            {loading ? "Loading..." : "Load More"}
+          </button>
         </div>
       </div>
     </div>
